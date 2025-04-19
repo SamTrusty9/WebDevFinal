@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Run Lamar Run!</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #87CEEB;
+      font-family: Arial, sans-serif;
+    }
+    #menu {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #228B22;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #menu h1 {
+      color: white;
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+    #menu button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background-color: #228B22;
+    }
+  </style>
+</head>
+<body>
+  <a href="scratch.html">Go Back</a>
+  <div id="menu">
+    <h1>Run Lamar Run!</h1>
+    <button id="easyBtn">Easy</button>
+    <button id="hardBtn">Hard</button>
+  </div>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <script>
+    const menu = document.getElementById('menu');
+    const easyBtn = document.getElementById('easyBtn');
+    const hardBtn = document.getElementById('hardBtn');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let gameSpeed, spawnInterval, quotes, currentQuote, quoteTime, lastSpawn;
+    let obstacles, score, gameTime, nextDifficultyIncrease, gameOver;
+    let runner, lastTime;
+
+    function initGame(mode) {
+      menu.style.display = 'none';
+      const levels = {
+        easy: { speed: 5, spawnInterval: 2000 },
+        hard: { speed: 8, spawnInterval: 1500 }
+      };
+      gameSpeed = levels[mode].speed;
+      spawnInterval = levels[mode].spawnInterval;
+
+      quotes = [
+        "Imma Raven!",
+        "They gon' get a Super Bowl outta me!",
+        "Everything outta me!"
+      ];
+      currentQuote = '';
+      quoteTime = 0;
+      lastSpawn = 0;
+      obstacles = [];
+      score = 0;
+      gameTime = 0;
+      nextDifficultyIncrease = 15000;
+      gameOver = false;
+
+      runner = {
+        x: 50,
+        y: canvas.height - 80,
+        width: 40,
+        height: 60,
+        velocityY: 0,
+        gravity: 0.5,
+        jumpForce: 12,
+        onGround: true
+      };
+
+      lastTime = 0;
+      requestAnimationFrame(gameLoop);
+    }
+
+    easyBtn.addEventListener('click', () => initGame('easy'));
+    hardBtn.addEventListener('click', () => initGame('hard'));
+
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space' && runner.onGround && !gameOver) {
+        runner.velocityY = -runner.jumpForce;
+        runner.onGround = false;
+        currentQuote = quotes[Math.floor(Math.random() * quotes.length)];
+        quoteTime = performance.now();
+      }
+    });
+
+    function gameLoop(timestamp) {
+      if (!lastTime) lastTime = timestamp;
+      const dt = timestamp - lastTime;
+      lastTime = timestamp;
+
+      update(dt);
+      draw();
+
+      if (!gameOver) {
+        requestAnimationFrame(gameLoop);
+      } else {
+        ctx.fillStyle = 'black';
+        ctx.font = '40px Arial';
+        ctx.fillText(
+          'Game Over! Yardage: ' + Math.floor(score),
+          canvas.width / 2 - 200,
+          canvas.height / 2
+        );
+      }
+    }
+
+    function update(dt) {
+      gameTime += dt;
+      score += (gameSpeed * dt) * 0.01;
+
+      if (gameTime > nextDifficultyIncrease) {
+        gameSpeed++;
+        spawnInterval = Math.max(500, spawnInterval - 200);
+        nextDifficultyIncrease += 15000;
+      }
+
+      runner.velocityY += runner.gravity;
+      runner.y += runner.velocityY;
+      if (runner.y > canvas.height - runner.height - 20) {
+        runner.y = canvas.height - runner.height - 20;
+        runner.velocityY = 0;
+        runner.onGround = true;
+      }
+
+      if (performance.now() - lastSpawn > spawnInterval) {
+        obstacles.push({
+          x: canvas.width,
+          y: canvas.height - 60,
+          width: 20,
+          height: 40
+        });
+        lastSpawn = performance.now();
+      }
+
+      obstacles.forEach((o, i) => {
+        o.x -= gameSpeed;
+        if (o.x + o.width < 0) obstacles.splice(i, 1);
+        if (
+          runner.x < o.x + o.width &&
+          runner.x + runner.width > o.x &&
+          runner.y < o.y + o.height &&
+          runner.y + runner.height > o.y
+        ) {
+          gameOver = true;
+        }
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Field background
+      ctx.fillStyle = '#228B22';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // White yard lines (horizontal)
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 4;
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Yard markers at bottom (vertical)
+      for (let x = 0; x < canvas.width; x += 100) {
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height - 20);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+
+      // Runner
+      ctx.fillStyle = 'purple';
+      ctx.fillRect(runner.x, runner.y, runner.width, runner.height);
+      ctx.fillStyle = 'white';
+      ctx.font = '20px Arial';
+      ctx.fillText('8', runner.x + runner.width / 2 - 5, runner.y + runner.height / 2 + 7);
+
+      // Defenders
+      ctx.fillStyle = 'red';
+      obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.width, o.height));
+
+      // Score (yardage)
+      ctx.fillStyle = 'white';
+      ctx.font = '20px Arial';
+      ctx.fillText('Yards: ' + Math.floor(score), 10, 30);
+
+      // Jump quote
+      if (currentQuote && performance.now() - quoteTime < 1000) {
+        ctx.fillStyle = 'yellow';
+        ctx.font = '24px Arial';
+        ctx.fillText(currentQuote, runner.x, runner.y - 10);
+      }
+    }
+  </script>
+</body>
+</html>
